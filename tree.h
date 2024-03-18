@@ -1,5 +1,6 @@
 #include <cassert>
 #include <iostream>
+#include <fcntl.h>
 
 #define PAGE_SIZE 64
 #define VALUE_SIZE 8
@@ -18,7 +19,7 @@ class Tree {
             numReads = 0;
             numWrites = 0;
 
-            database = fopen(filename.c_str(), "wb+");
+            database = ::open(filename.c_str(), O_RDWR | O_CREAT);
             assert(database);
         }
 
@@ -35,8 +36,23 @@ class Tree {
         }
 
         void close() {
-            fclose(database);
-            database = NULL;
+            ::close(database);
+            database = 0;
+        }
+
+        char * getPage(int pos) {
+            char * page = new char[PAGE_SIZE]();
+            lseek(database, PAGE_SIZE * pos, SEEK_SET);
+            ::read(database, page, PAGE_SIZE);
+            numReads++;
+
+            return page;
+        }
+
+        void setPage(int pos, void * page) {
+            lseek(database, PAGE_SIZE * pos, SEEK_SET);
+            ::write(database, page, PAGE_SIZE);
+            numWrites++;
         }
 
         int getNumWrites() {
@@ -48,7 +64,7 @@ class Tree {
         }
 
     protected:
-        FILE * database;
+        int database;
         int numWrites;
         int numReads;
 };
