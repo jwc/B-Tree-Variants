@@ -9,6 +9,8 @@ uBPlusTree:
 	
 	$(CXX) $(CXXFLAGS) ubpwrite.cpp
 
+	$(CXX) $(CXXFLAGS) ubpread.cpp
+
 build: *.o
 	$(CXX) $(CXXFLAGS) test.cpp
 

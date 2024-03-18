@@ -54,6 +54,31 @@ int main() {
 
     t->printTree();
 
+    char null[5] = "NULL";
+    char * temp;
+
+    temp = t->read(55);
+    if (temp == NULL) temp = null;
+    cerr << "read(55):" << temp << endl;
+
+    temp = t->read(10);
+    if (temp == NULL) temp = null;
+    cerr << "read(10):" << temp << endl;
+
+    temp = t->read(50);
+    if (temp == NULL) temp = null;
+    cerr << "read(50):" << temp << endl;
+
+    temp = t->read(100);
+    if (temp == NULL) temp = null;
+    cerr << "read(100):" << temp << endl;
+
+    for(int i = 0; i < GAIN_THRESHOLD + 2; i++) {
+        t->read(30);
+        cout << endl;
+    }
+
+    t->printTree();
     cout << endl;
     delete t;
     return 0;

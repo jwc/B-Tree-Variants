@@ -57,7 +57,7 @@ class uBPlusTree : public Tree {
         // void erase(int);
 
         // ubpread.cpp
-        // char * read(int);
+        char * read(int);
 
         #ifdef DEBUG
         void printTree() {
@@ -80,7 +80,7 @@ class uBPlusTree : public Tree {
         std::pair<int, char *> localInsert(std::pair<int, char *>, Node *);
 
         // ubpread.cpp
-        // std::pair<char *, std::pair<int, char *>> search(int, Node *);
+        std::pair<char *, std::pair<int, char *>> search(int, Node *);
 
         // ubperase.cpp
         // std::pair<int, char *> delet(int, Node);
