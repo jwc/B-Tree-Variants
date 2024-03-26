@@ -1,46 +1,44 @@
-#include <cassert>
 #include <iostream>
 #include <fcntl.h>
+#include <unistd.h>
 
+// #define DEBUG
+
+#ifdef DEBUG
+#include <cassert>
+#endif
+
+#ifndef PAGE_SIZE
 #define PAGE_SIZE 64
+#endif
+
+#ifndef VALUE_SIZE
 #define VALUE_SIZE 8
+#endif
+
+#define TREE
 
 class Tree {
     public:
         explicit Tree(std::string filename) {
-            open(filename);
-        }
-
-        ~Tree() {
-            close();
-        }
-
-        void open(std::string filename) {
+            database = 0;
             numReads = 0;
             numWrites = 0;
-
-            database = ::open(filename.c_str(), O_RDWR | O_CREAT);
-            assert(database);
         }
 
-        void write(int, char[VALUE_SIZE]) {
-            return;
-        }
+        virtual ~Tree() { ; }
 
-        char * read(int) {
-            return new char[VALUE_SIZE]();
-        }
+        virtual void open(std::string filename) = 0;
 
-        void erase(int) {
-            return;
-        }
+        virtual void write(int, char[VALUE_SIZE]) = 0;
 
-        void close() {
-            ::close(database);
-            database = 0;
-        }
+        virtual char * read(int) = 0; 
 
-        char * getPage(int pos) {
+        virtual void erase(int) = 0;
+
+        virtual void close() = 0;
+
+        virtual char * getPage(int pos) {
             char * page = new char[PAGE_SIZE]();
             lseek(database, PAGE_SIZE * pos, SEEK_SET);
             ::read(database, page, PAGE_SIZE);
@@ -49,7 +47,7 @@ class Tree {
             return page;
         }
 
-        void setPage(int pos, void * page) {
+        virtual void setPage(int pos, void * page) {
             lseek(database, PAGE_SIZE * pos, SEEK_SET);
             ::write(database, page, PAGE_SIZE);
             numWrites++;
@@ -62,6 +60,12 @@ class Tree {
         int getNumReads() {
             return numReads;
         }
+        
+        #ifdef DEBUG
+        virtual int getCardinality() = 0;
+
+        virtual void printTree() = 0;
+        #endif
 
     protected:
         int database;

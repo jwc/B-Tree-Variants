@@ -1,61 +1,111 @@
-#include "ubptree.h"
+#include <cstring>
+
+#include "ubpTree.h"
 
 using namespace std;
 
 char * uBPlusTree::read(int key) {
-    return search(key, getNode(root)).first;
+    Node * r = getNode(root);
+    char * val;
+    int discrim;
+    Node * newChld;
+    tie(val, discrim, newChld) = search(r, key);
+
+    if (newChld) {
+        // Need new root
+        Node * newRoot = allocateNode(BRANCH);
+        root = getIndex(newRoot);
+
+        newRoot->b.offsets[0] = getIndex(r);
+        newRoot->b.offsets[1] = getIndex(newChld);
+        newRoot->b.discrim[0] = discrim;
+        newRoot->b.card = 2;
+
+        setNode(newRoot);
+    }
+
+    return val;
 }
 
-// Algorithm 4. search(k, R)
-// input : key k and current root R
-// output: value v associated with k and record <k', p'> where k is 
-//         a discriminator value and p' a pointer to a tree node; 
-//         ⊥ indicates no further processing
+tuple<char *, int, Node *> uBPlusTree::search(Node * node, int key) {
+    char * val = NULL;
+    int discrim;
+    
+    if (isLeaf(node)) {
+        if (!hasOvfl(node) || key <= getMax(node)) {
+            // check node
+            for (int i = 0; i < node->l.card; i++) {
+                if (key == node->l.keys[i]) {
+                    val = new char[VALUE_SIZE]();
 
-// 1 if R is a leaf then
-// 2 if R.ovfl = ⊥ then return R.find(k), ⊥;
-// 3 else if k < R.max then return R.find(k), ⊥;
-// 4 else
-// 5    v = R.find(k);
-// 6    if gain has been expensed then R.ovfl = ⊥; return v, <R.ovfl.min, R.ovfl>;
-// 7    else return v, ⊥;
-// 8 else Q = R.find(k); v, <l, p> = search(k, Q); return v, localInsert(<l, p>, R);
+                    memcpy(val, node->l.values[i], VALUE_SIZE);
+                    return {val, 0, NULL};
+                }
+            }
+            // key not in node
+            return {NULL, 0, NULL};
+        }
 
-std::pair<char *, std::pair<int, char *>> uBPlusTree::search(int k, Node * R) {
-    cout << "\tSearch:" << R->l.index;
-    if (isLeaf(R)) {
-        cout << "\tLeaf:";
-        Node * R_ovfl = NULL;
-        if (R->l.overflow > -1) R_ovfl = getNode(R->l.overflow);
-
-        if (R_ovfl == NULL) {
-            cout << "\tRetA\t";
-            return {find(R, k), {-1, NULL}};
-        } else if (k <= getMax(R)) {
-            cout << "\tRetB\t";
-            return {find(R, k), {-1, NULL}};
-        } else {
-            cout << "\tRetC\t";
-            auto v = find(R_ovfl, k);
-            
-            if (gainExpensed(R_ovfl)) {
-                cout << "GAIN EXPENSED (S)" << endl;
-                R->l.overflow = -1;
-                R_ovfl->l.type = LEAF;
-                setNode(R);
-                setNode(R_ovfl);
-                return {v, {getMin(R_ovfl), (char *) R_ovfl}};
-            } else {
-                return {v, {-1, NULL}};
+        Node * node_ovfl = getOvfl(node);
+        // check node_ovfl
+        for (int i = 0; i < node_ovfl->l.card; i++) {
+            if (key == node_ovfl->l.keys[i]) {
+                val = new char[VALUE_SIZE]();
+                memcpy(val, node_ovfl->l.values[i], VALUE_SIZE);
+                break;
             }
         }
+
+        if (gainExpensed(node_ovfl)) {
+            unsetOvfl(node, node_ovfl);
+            discrim = redistributeLeaf(node, node_ovfl, 0, NULL);
+            return {val, discrim, node_ovfl};
+
+        } else {
+            return {val, 0, NULL};
+        }
+
+
     } else {
-        cout << "\tNode:";
-        Node * Q = (Node *) find(R, k);
-        cout << Q->l.index;
-        auto x = search(k, Q);
-        return {x.first, localInsert(x.second, R)};
+        Node * chld = findChld(node, key);
+        Node * newChld;
+        tie(val, discrim, newChld) = search(chld, key);
+
+        if (newChld == NULL) {
+            // no rebalancing.
+            return {val, 0, NULL};
+
+        } else if (getCard(node) < NUM_BRANCH_VALS) {
+            // must rebalance
+            putNode(node, discrim, newChld);
+            return {val, 0, NULL};
+
+        } else {
+            Node * newSibling = allocateNode(BRANCH);
+            int newDiscrim = redistributeNode(node, newSibling, discrim, newChld);
+            return {val, newDiscrim, newSibling};
+        }
     }
+
+    #ifdef DEBUG
+    assert(false);
+    #endif
+    
+    return {NULL, 0, NULL};
 }
 
+Node * uBPlusTree::findChld(Node * node, int key) {
+    #ifdef DEBUG
+    assert(node);
+    assert(node->b.type == BRANCH);
+    assert(node->b.card > 0);
+    #endif
 
+    if (node->b.card == 1) return getNode(node->b.offsets[0]);
+
+    for (int i = 0; i < node->b.card - 1; i++) 
+        if (node->b.discrim[i] > key) 
+            return getNode(node->b.offsets[i]);
+
+    return getNode(node->b.offsets[getCard(node) - 1]);
+}

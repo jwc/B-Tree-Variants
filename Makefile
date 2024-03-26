@@ -1,22 +1,34 @@
-exec_name = a
+CXX = clang++
+CXXFLAGS = -g -std=c++20 -D PAGE_SIZE=$(PAGE_SIZE) -D VALUE_SIZE=$(VALUE_SIZE)
 
-CXXFLAGS = -g -c
+PAGE_SIZE = 512
+VALUE_SIZE = 12
 
-all: uBPlusTree build
+UBPDEPS = ubpOpen.o ubpWrite.o ubpRead.o ubpErase.o ubpMisc.o ubpRedist.o ubpCard.o
+ASBDEPS = 
+ABDEPS = 
 
-uBPlusTree: 
-	$(CXX) $(CXXFLAGS) ubpmisc.cpp
-	
-	$(CXX) $(CXXFLAGS) ubpwrite.cpp
+# X -> testX.cpp
+TESTS = 0 1 2 3
 
-	$(CXX) $(CXXFLAGS) ubpread.cpp
+UBPTESTS := $(foreach test,$(TESTS),ubp$(test).out) 
+ASBTESTS := $(foreach test,$(TESTS),asb$(test).out) 
+ABTESTS := $(foreach test,$(TESTS),ab$(test).out) 
 
-build: *.o
-	$(CXX) $(CXXFLAGS) test.cpp
+all: ubp asb ab
 
-	$(CXX) $?
+ubp: $(UBPDEPS) $(UBPTESTS)
+asb: $(ASBDEPS) $(ASBTESTS)
+ab: $(ABDEPS) $(ABTESTS)
 
-clean: *.o
-	$(RM) a.exe
-	
-	rm $?
+ubp%.out: test%.cpp
+	$(CXX) $(CXXFLAGS) $(UBPDEPS) -D UBPTREE -o $@ $?
+
+asb%.out: test%.cpp
+	$(CXX) $(CXXFLAGS) $(ASBDEPS) -D ASBTREE -o $@ $?
+
+ab%.out: test%.cpp
+	$(CXX) $(CXXFLAGS) $(ABDEPS) -D ABTREE -o $@ $?
+
+clean:
+	$(RM) *.o *.out *.txt

@@ -1,15 +1,14 @@
-#include <utility>
 #include <map>
+#include <tuple>
+#include <sys/stat.h>
 
 #include "tree.h"
-
-#define DEBUG
 
 #define NUM_LEAF_VALS (PAGE_SIZE - (4 * sizeof(int))) / (VALUE_SIZE + sizeof(int))
 #define NUM_BRANCH_VALS ((PAGE_SIZE - (3 * sizeof(int))) / (2 * sizeof(int)))
 #define GAIN_THRESHOLD 4
 
-enum NodeType {BRANCH, LEAF, OVERFLOW};
+enum NodeType {BRANCH, LEAF, OVFL};
 
 struct Leaf {
     enum NodeType type;
@@ -36,78 +35,53 @@ typedef union {
 
 class uBPlusTree : public Tree {
     public:
-        explicit uBPlusTree(std::string f) : Tree(f) {
-            root = 0;
-            Node * r = new Node;
-            r->b.index = 0;
-            r->b.type = LEAF;
-            r->b.card = 0;
-            r->l.overflow = -1;
-            setPage(0, r);
-            numPages = 1;
+        explicit uBPlusTree(std::string filename) : Tree(filename) {
+            open(filename);
 
+            #ifdef DEBUG
             assert(sizeof(Node) <= PAGE_SIZE);
             assert(NUM_LEAF_VALS >= 3);
+            #endif
         }
 
-        // ubpwrite.cpp
+        ~uBPlusTree() {
+            if (database) close();    
+        }
+
+        // ubpOpen.cpp
+        void open(std::string filename);
+
+        void close();
+
+        // ubpWrite.cpp
         void write(int, char *);
 
-        // ubperase.cpp
-        // void erase(int);
+        // ubpErase.cpp
+        void erase(int);
 
-        // ubpread.cpp
+        // ubpRead.cpp
         char * read(int);
 
         #ifdef DEBUG
-        void printTree() {
-            // std::cout << "root:" << root << "\n";
-            Node * r = getNode(root);
-            std::cout << "\tTREE:" << r << "\n";
-            printPage(r);
-            std::cout << "\twrites: " << numWrites << "\n";
-            std::cout << "\treads: " << numReads << "\n";
-        }
+        // ubpCard.cpp
+        int getCardinality();
+
+        void printTree();
         #endif
 
     private:
         int root;
         int numPages;
         std::map<int, int> gain;
-        
-        // ubpwrite.cpp
-        std::pair<int, char *> insert(int, char *, Node *);
-        std::pair<int, char *> localInsert(std::pair<int, char *>, Node *);
-
-        // ubpread.cpp
-        std::pair<char *, std::pair<int, char *>> search(int, Node *);
-
-        // ubperase.cpp
-        // std::pair<int, char *> delet(int, Node);
-
-        // ubpmisc.cpp
-        char * find(Node *, int);
-        void put(Node *, std::pair<int, char*>);
-        void remove(Node *, int);
-        Node * allocateNode();
-        bool redistribute_l(Node *, Node *, std::pair<int, char*>);
-        int redistribute_b(Node *, Node *, std::pair<int, char*>);
-        std::pair<int, char *> split(Node *, Node *, std::pair<int, char *>);
-
-        int getMax(Node * node) {
-            if (isLeaf(node)) return node->l.keys[node->l.card - 1];
-            else return getMax(getNode(node->b.offsets[getCard(node) - 1]));
-        }
-
-        int getMin(Node * node) {
-            if (isLeaf(node)) return node->l.keys[0];
-            else return getMin(getNode(node->b.offsets[0]));
-        }
-
+    
         char * getPage(int pos) {
-            fseek(database, (PAGE_SIZE * pos), 0);
+            #ifdef DEBUG
+            assert(database);
+            #endif
+
             char * page = new char[PAGE_SIZE]();
-            fread(page, PAGE_SIZE, 1, database);
+            lseek(database, (PAGE_SIZE * pos), 0);
+            ::read(database, page, PAGE_SIZE);
             numReads++;
 
             int temp = gain[pos];
@@ -118,8 +92,12 @@ class uBPlusTree : public Tree {
         }
 
         void setPage(int pos, void * page) {
-            fseek(database, (PAGE_SIZE * pos), 0);
-            fwrite(page, PAGE_SIZE, 1, database);
+            #ifdef DEBUG
+            assert(database);
+            #endif
+
+            lseek(database, (PAGE_SIZE * pos), 0);
+            ::write(database, page, PAGE_SIZE);
             numWrites++;
 
             int temp = gain[pos] - 1;
@@ -127,62 +105,63 @@ class uBPlusTree : public Tree {
             gain[pos] = temp;
         }
 
-        Node * getNode(int index) {
-            return (Node *) getPage(index);
+        // ubpwrite.cpp
+        std::tuple<int, Node *> insert(Node *, int, char *);
+
+        // ubpread.cpp
+        std::tuple<char *, int, Node *> search(Node *, int);
+
+        Node * findChld(Node *, int);
+
+        // ubpmisc.cpp
+        Node * allocateNode(enum NodeType type);
+
+        void putNode(Node *, int, Node *);
+
+        void putLeaf(Node *, int, char *);
+
+        // ubp redistribute.cpp
+        int redistributeNode(Node *, Node *, int, Node *);
+
+        int redistributeLeaf(Node *, Node *, int, char *);
+
+        // Other
+        int getMax(Node * node) { return isLeaf(node) ? node->l.keys[node->l.card - 1] : getMax(getNode(node->b.offsets[getCard(node) - 1])); }
+
+        int getMin(Node * node) { return isLeaf(node) ? node->l.keys[0] : getMin(getNode(node->b.offsets[0])); }
+
+        Node * getNode(int index) { return (Node *) getPage(index); }
+
+        void setNode(Node * node) { setPage(node->l.index, node); }
+
+        int getCard(Node * node) { return node->l.card; }
+
+        int getGain(Node * node) { return gain.find(node->b.index) == gain.end() ? -1 : gain.find(node->b.index)->second; }
+
+        void setGain(Node * node, int newGain) { gain[node->l.index] = newGain; }
+
+        bool gainExpensed(Node * node) { return getGain(node) > GAIN_THRESHOLD; }
+
+        int getIndex(Node * node) { return node->l.index; }
+
+        Node * getOvfl(Node * node) { return getNode(node->l.overflow); }
+
+        void setOvfl(Node * R, Node * R_ovfl) { R->l.overflow = R_ovfl->l.index; }
+
+        void unsetOvfl(Node * R, Node * R_ovfl) {
+            R->l.overflow = -1;
+            R_ovfl->l.type = LEAF;
         }
 
-        void setNode(Node * node) {
-            setPage(node->l.index, node);
-        }
+        bool hasOvfl(Node * node) { return node->l.overflow > 0; }
 
-        int getCard(Node * node) {
-            return node->l.card;
-        }
-
-        void setGain(Node * node, int newGain) {
-            gain[node->l.index] = newGain;
-        }
-
-        int getGain(Node * node) {
-            return gain.find(node->b.index) == gain.end() ? -1 : gain.find(node->b.index)->second;
-        }
-
-        bool gainExpensed(Node * node) {
-            return getGain(node) > GAIN_THRESHOLD;
-        }
-
-        bool isLeaf(Node * n) {
-            return n->l.type != BRANCH;
-        }
+        bool isLeaf(Node * n) { return n->l.type != BRANCH; }
 
         #ifdef DEBUG
-        void printPage(Node * node) {
-            if (node->l.type != BRANCH) {
-                std::cerr << "{id:" << node->l.index << " ty:" << node->l.type << " card:" <<
-                            node->l.card << " ovfl:" << node->l.overflow << " min:" << getMin(node) << 
-                            " max:" << getMax(node) << " keys:"; 
-                
-                for (int i = 0; i < node->l.card; i++) {
-                    std::cerr << "(" << node->l.keys[i] << ")";
-                }
+        // ubpCard.cpp
+        int getCardinalityRecursive(Node * node);
 
-                std::cerr << "}" << std::endl;
-
-                if (node->l.type == LEAF && node->l.overflow >=0) 
-                    printPage(getNode(node->l.overflow));
-            } else {
-                std::cerr << "{id:" << node->b.index << " ty:" << node->b.type << " card:" << 
-                node->b.card << " ptrs:"; 
-                for (int i = 0; i < node->b.card; i++) {
-                    if (i == node->b.card - 1) 
-                        std::cerr << "(" << node->b.offsets[i] << ")";
-                    else
-                        std::cerr << "(" << node->b.offsets[i] << ")" << node->b.discrim[i];
-                }
-                std::cerr << "}\n";
-                for (int i = 0; i < node->b.card; i++)
-                    printPage(getNode(node->b.offsets[i]));
-            }
-        }
+        int treeCard;
+        void printPage(Node * node);
         #endif
 };
