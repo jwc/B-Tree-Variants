@@ -9,14 +9,14 @@ void uBPlusTree::write(int key, char * value) {
 
     int k;
     Node * n;
-    Node * r = getNode(root);
+    Node * r = getNode(metadata.root);
 
     tie(k, n) = insert(r, key, value);
 
     if (n) {
         // Need new root
         Node * newRoot = allocateNode(BRANCH);
-        root = getIndex(newRoot);
+        metadata.root = getIndex(newRoot);
 
         newRoot->b.offsets[0] = getIndex(r);
         newRoot->b.offsets[1] = getIndex(n);
@@ -66,11 +66,11 @@ tuple<int, Node *> uBPlusTree::insert(Node * R, int key, char * value) {
             putLeaf(R, key, value);
             return {0, NULL};
 
-        // } else if (gainExpensed(R_ovfl)) {
-        //     // gain expensed. Must split
-        //     unsetOvfl(R, R_ovfl);
-        //     int discrim = redistributeLeaf(R, R_ovfl, key, value);
-        //     return {discrim, R_ovfl};
+        } else if (gainExpensed(R_ovfl)) {
+            // gain expensed. Must split
+            unsetOvfl(R, R_ovfl);
+            int discrim = redistributeLeaf(R, R_ovfl, key, value);
+            return {discrim, R_ovfl};
 
         } else if (key > getMax(R) && getCard(R_ovfl) < NUM_LEAF_VALS && getCard(R) < NUM_LEAF_VALS) {
             // place into R_ovfl
@@ -83,12 +83,6 @@ tuple<int, Node *> uBPlusTree::insert(Node * R, int key, char * value) {
             return {0, NULL};
         }
 
-        // if (expensedGain(R)) {
-
-        // } else {
-        //     return {0, NULL};
-        // }
-
     } else {
         int discrim;
         Node * node;
@@ -96,7 +90,6 @@ tuple<int, Node *> uBPlusTree::insert(Node * R, int key, char * value) {
 
         #ifdef DEBUG
         assert(getCard(R) > 0);
-        // assert(discrim < 10000);
         #endif
         
         if (node) {
@@ -107,9 +100,9 @@ tuple<int, Node *> uBPlusTree::insert(Node * R, int key, char * value) {
                 return {0, NULL};
             } else {
                 // no room. must split, redistribute, pass up new node. 
-                Node * newNode = allocateNode(BRANCH);
-                discrim = redistributeNode(R, newNode, discrim, node);
-                return {discrim, newNode};
+                Node * newSibling = allocateNode(BRANCH);
+                discrim = redistributeNode(R, newSibling, discrim, node);
+                return {discrim, newSibling};
             }
         } else {
             // No additional work needed

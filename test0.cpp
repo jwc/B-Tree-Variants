@@ -16,24 +16,26 @@
 using namespace std;
 
 int main() {
-    cout << "INT_SIZE: " << sizeof(int) << endl;
-    cout << "PTR_SIZE: " << sizeof(char *) << endl;
-    cout << "PAGE_SIZE: " << PAGE_SIZE << endl;
-    cout << "VALUE_SIZE: " << VALUE_SIZE << endl;
+    string space = "     ";
+    cout << space << "sizeof(int): " << sizeof(int) << endl;
+    cout << space << "sizeof(char *): " << sizeof(char *) << endl;
+    cout << space << "PAGE_SIZE: " << PAGE_SIZE << endl;
+    cout << space << "VALUE_SIZE: " << VALUE_SIZE << endl;
 
     #ifdef UBPTREE
-    cout << "NUM_LEAF_VALS: " << NUM_LEAF_VALS << "\n";
-    cout << "NUM_BRANCH_VALS: " << NUM_BRANCH_VALS << "\n";
-    cout << "ENUM: " << sizeof(enum NodeType) << "\n";
-    cout << "struct Leaf: " << sizeof(struct Leaf) << "\n";
-    cout << "struct Branch: " << sizeof(struct Branch) << endl;
-    cout << "struct Node: " << sizeof(Node) << "\n";
-    cout << "struct Tree: " << sizeof(uBPlusTree) << "\n";
+    cout << space << "NUM_LEAF_VALS: " << NUM_LEAF_VALS << "\n";
+    cout << space << "NUM_BRANCH_VALS: " << NUM_BRANCH_VALS << "\n";
+    cout << space << "FREELIST_SIZE: " << FREELIST_SIZE << "\n";
+    cout << space << "sizeof(enum NodeType): " << sizeof(enum NodeType) << "\n";
+    cout << space << "sizeof(struct Leaf): " << sizeof(struct Leaf) << "\n";
+    cout << space << "sizeof(struct Branch): " << sizeof(struct Branch) << endl;
+    cout << space << "sizeof(Node): " << sizeof(Node) << "\n";
+    cout << space << "sizeof(uBPlusTree): " << sizeof(uBPlusTree) << "\n";
     #endif
 
     struct stat fileStats;
     stat("Makefile", &fileStats);
-    cout << "File System block size: " << fileStats.st_blksize << endl;
+    cout << space << "File System block size: " << fileStats.st_blksize << endl;
 
     return 0;
 }

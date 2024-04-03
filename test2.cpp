@@ -16,12 +16,12 @@
 #endif
 
 #ifndef COUNT
-#define COUNT 10
+#define COUNT 1000
 #endif
 
 using namespace std;
 
-// Tests Reading from the tree.
+// Tests Reading and Writing from a new tree.
 
 int main() {
     vector<int> testValues;
@@ -43,7 +43,6 @@ int main() {
     #endif
 
     // Writing random values to the tree.
-    
     for (int i = 0; allKeys.size() < COUNT; i++) {
         int x = rand();
         x = rand() % 2 ? -x : x;
@@ -62,9 +61,9 @@ int main() {
         t->write(x, z);
     }
 
-    // Reading values from the tree.
+    // Reading values from the tree. 
     char * temp = NULL;
-    for (auto &i : testValues) {
+    for (auto &i : allKeys) {
         temp = t->read(i);
         string y = to_string(i);
         char * z = new char[VALUE_SIZE]();

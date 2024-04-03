@@ -21,7 +21,7 @@
 
 using namespace std;
 
-// Tests reopening and Reading an existing tree.
+// Tests reopening and Deleting from an existing tree.
 
 int main() {
     vector<int> testValues;
@@ -53,39 +53,31 @@ int main() {
     }
 
     #ifdef DEBUG
-    cout << "\tExp. Card: " << allKeys.size() << endl;
     assert(allKeys.size() == t->getCardinality());
     #endif
     
-    // Reading values from the tree. 
+    // Deleting all values from the tree. Note: there are repeats.
     char * temp = NULL;
     for (auto &i : testValues) {
-        temp = t->read(i);
-        string y = to_string(i);
-        char * z = new char[VALUE_SIZE]();
-        strcpy(z, y.c_str());
+        // cout << "DELETE(" << i << ")" << endl;
+        t->erase(i);
 
-        if (z != NULL && temp != NULL) {
-            if (strcmp(z, temp) != 0) {
-                cerr << "ERROR: Incorrect Value. Expected:" << z << ", Returned:" << temp << endl;
-
-                #ifdef DEBUG
-                assert(false);
-                #endif
-            }
-        } else {
-            cerr << "ERROR: Null Value" << endl;
-
-            #ifdef DEBUG
-            assert(false);
-            #endif
+        if (allKeys.find(i) != allKeys.end()) {
+            allKeys.erase(allKeys.find(i));
         }
+
+        #ifdef DEBUG
+        // t->printTree();
+        // cout << "\tExp. Card: " << allKeys.size() << endl;
+        assert(allKeys.size() == t->getCardinality());
+        #endif
+
     }
 
     #ifdef DEBUG
     // t->printTree();
     // cout << "\tExp. Card: " << allKeys.size() << endl;
-    assert(allKeys.size() == t->getCardinality());
+    assert(0 == t->getCardinality());
     #endif
     
     cout << "    Pages Wrote: " << t->getNumWrites();

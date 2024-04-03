@@ -6,6 +6,7 @@
 
 #define NUM_LEAF_VALS (PAGE_SIZE - (4 * sizeof(int))) / (VALUE_SIZE + sizeof(int))
 #define NUM_BRANCH_VALS ((PAGE_SIZE - (3 * sizeof(int))) / (2 * sizeof(int)))
+#define FREELIST_SIZE PAGE_SIZE - (3 * sizeof(int))
 #define GAIN_THRESHOLD 4
 
 enum NodeType {BRANCH, LEAF, OVFL};
@@ -32,6 +33,13 @@ typedef union {
     struct Branch b;
     struct Leaf l;
 } Node;
+
+typedef struct {
+    int root;
+    int numPages;
+    int numFreePages;
+    int freelist[FREELIST_SIZE];
+} TreeData;
 
 class uBPlusTree : public Tree {
     public:
@@ -70,8 +78,7 @@ class uBPlusTree : public Tree {
         #endif
 
     private:
-        int root;
-        int numPages;
+        TreeData metadata;
         std::map<int, int> gain;
     
         char * getPage(int pos) {
@@ -113,14 +120,29 @@ class uBPlusTree : public Tree {
 
         Node * findChld(Node *, int);
 
+        // ubpErase.cpp
+        std::tuple<Node *, int, Node *> remove(Node *, int);
+
         // ubpmisc.cpp
         Node * allocateNode(enum NodeType type);
+
+        void deallocateNode(Node *);
 
         void putNode(Node *, int, Node *);
 
         void putLeaf(Node *, int, char *);
 
+        void removeNode(Node *, int);
+
+        Node * removeLeaf(Node *, int);
+        
+        Node * merge(Node *, Node *, int);
+
+        Node * mergeLeaf(Node *, Node *, int);
+
         // ubp redistribute.cpp
+        int redistribute(Node *, Node *) ;
+
         int redistributeNode(Node *, Node *, int, Node *);
 
         int redistributeLeaf(Node *, Node *, int, char *);

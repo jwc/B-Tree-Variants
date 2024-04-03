@@ -5,7 +5,7 @@
 using namespace std;
 
 char * uBPlusTree::read(int key) {
-    Node * r = getNode(root);
+    Node * r = getNode(metadata.root);
     char * val;
     int discrim;
     Node * newChld;
@@ -14,7 +14,7 @@ char * uBPlusTree::read(int key) {
     if (newChld) {
         // Need new root
         Node * newRoot = allocateNode(BRANCH);
-        root = getIndex(newRoot);
+        metadata.root = getIndex(newRoot);
 
         newRoot->b.offsets[0] = getIndex(r);
         newRoot->b.offsets[1] = getIndex(newChld);

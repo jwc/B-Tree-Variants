@@ -4,6 +4,13 @@
 
 using namespace std;
 
+int uBPlusTree::redistribute(Node * node1, Node * node2) {
+    if (isLeaf(node1))
+        return redistributeLeaf(node1, node2, 0, NULL);
+    else 
+        return redistributeNode(node1, node2, 0, NULL);
+}
+
 int uBPlusTree::redistributeNode(Node * N1, Node * N2, int discriminator, Node * child) {
     vector<int> discriminators;
     map<int, int> offsets;
@@ -20,6 +27,7 @@ int uBPlusTree::redistributeNode(Node * N1, Node * N2, int discriminator, Node *
     }
 
     if (N2->b.card > 0) {
+        runningMax = getMin(N2);
         discriminators.push_back(runningMax);
         offsets[runningMax] = N2->b.offsets[0];
     }
@@ -105,6 +113,10 @@ int uBPlusTree::redistributeLeaf(Node * N1, Node * N2, int key, char * value) {
     int j = 0;
     int retVal = -1;
     while (ik != keys.end()) {
+        #ifdef DEBUG
+        assert(values.find(*ik) != values.end());
+        #endif
+
         if (N1->l.card < num) {
             N1->l.keys[i] = *ik;
             retVal = *ik;
@@ -125,6 +137,9 @@ int uBPlusTree::redistributeLeaf(Node * N1, Node * N2, int key, char * value) {
     assert(N2->l.index > 0);
     assert(getMax(N1) < getMin(N2));
     #endif
+
+    keys.clear();
+    values.clear();
 
     setNode(N1);
     setNode(N2);

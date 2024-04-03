@@ -1,3 +1,5 @@
+#include <bits/stdc++.h> 
+
 #include "ubpTree.h"
 
 void uBPlusTree::open(std::string filename) {
@@ -12,27 +14,25 @@ void uBPlusTree::open(std::string filename) {
 
             if (statRet != 0 || fileInfo.st_size < 2 * PAGE_SIZE) {
                 // New tree
-                int metadata[PAGE_SIZE / sizeof(int)] = {0};
-                metadata[0] = 1;
-                metadata[1] = 1;
-                numPages = 1;
+                metadata.root = 1;
+                metadata.numPages = 1;
+                metadata.numFreePages = 0;
                 setPage(0, (void *) &metadata);
 
                 Node * node = allocateNode(LEAF);
-                root = node->l.index;
-                setPage(root, node);
+                metadata.root = node->l.index;
+                setPage(metadata.root, node);
 
             } else {
                 // Existing tree
-                int * metadata = (int *) getPage(0);
-                root = metadata[0];
-                numPages = metadata[1];
+                char * page = getPage(0);
+                memcpy(&metadata, page, sizeof(TreeData));
             }
 
             #ifdef DEBUG
             assert(database);
-            assert(root > 0);
-            assert(numPages > 1);
+            assert(metadata.root > 0);
+            assert(metadata.numPages > 1);
             #endif
         }
 
@@ -41,10 +41,7 @@ void uBPlusTree::open(std::string filename) {
             assert(database);
             #endif
 
-            int metadata[PAGE_SIZE / sizeof(int)] = {0};
-            metadata[0] = root;
-            metadata[1] = numPages;
-            setPage(0, (void *) &metadata);
+            setPage(0, &metadata);
 
             ::close(database);
             database = 0;

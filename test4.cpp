@@ -21,7 +21,7 @@
 
 using namespace std;
 
-// Tests writing to a new tree.
+// Tests writing and deleting from a new tree.
 
 int main() {
     vector<int> testValues;
@@ -29,7 +29,7 @@ int main() {
     Tree * t = NULL;
 
     #ifdef UBPTREE
-    t = new uBPlusTree("ubp1.txt");
+    t = new uBPlusTree("ubp4.txt");
     #endif
     #ifdef ASBTREE
     t = NULL;
@@ -63,8 +63,18 @@ int main() {
 
     #ifdef DEBUG
     // t->printTree();
-    // cout << "\tExp. Card: " << allKeys.size() << endl;
-    assert(allKeys.size() == t->getCardinality());
+    #endif
+
+    // Deleting all values from the tree. Note: there are no repeats.
+    char * temp = NULL;
+    for (auto &i : allKeys) {
+        t->erase(i);
+    }
+
+    #ifdef DEBUG
+    // t->printTree();
+    cout << "\tExp. Card: " << 0 << endl;
+    assert(0 == t->getCardinality());
     #endif
 
     cout << "    Pages Wrote: " << t->getNumWrites();
