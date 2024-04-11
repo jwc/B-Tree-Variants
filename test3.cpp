@@ -6,7 +6,7 @@
 #include "ubpTree.h"
 #endif
 #ifdef ASBTREE
-#include ""
+#include "asbtree.h"
 #endif
 #ifdef ABTREE
 #include ""
@@ -32,7 +32,9 @@ int main() {
     t = new uBPlusTree("ubp1.txt");
     #endif
     #ifdef ASBTREE
-    t = NULL;
+    //t = new ASBTree("asbtree");
+    delete t;
+    return 0;
     #endif
     #ifdef ABTREE
     t = NULL;

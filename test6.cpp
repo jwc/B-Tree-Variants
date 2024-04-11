@@ -6,7 +6,7 @@
 #include "ubpTree.h"
 #endif
 #ifdef ASBTREE
-#include ""
+#include "asbtree.h"
 #endif
 #ifdef ABTREE
 #include ""
@@ -33,7 +33,7 @@ int main() {
     t = new uBPlusTree("ubp6.txt");
     #endif
     #ifdef ASBTREE
-    t = NULL;
+    t = new ASBTree("asbtree");
     #endif
     #ifdef ABTREE
     t = NULL;
@@ -106,7 +106,7 @@ int main() {
                 x = rand() % MAX;
 
                 t->erase(x);
-                
+
                 if (allKeys.find(x) != allKeys.end()) {
                     allKeys.erase(allKeys.find(x));
                 }

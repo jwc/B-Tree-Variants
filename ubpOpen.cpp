@@ -1,5 +1,3 @@
-#include <bits/stdc++.h> 
-
 #include "ubpTree.h"
 
 void uBPlusTree::open(std::string filename) {

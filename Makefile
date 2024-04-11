@@ -5,7 +5,7 @@ PAGE_SIZE = 512
 VALUE_SIZE = 12
 
 UBPFILES = ubpOpen.o ubpWrite.o ubpRead.o ubpErase.o ubpMisc.o ubpRedist.o ubpCard.o
-ASBFILES = 
+ASBFILES = asberase.o asbinsert.o asbmisc.o asbsearch.o
 ABFILES = 
 
 # X -> testX.cpp
@@ -31,4 +31,5 @@ ab%.out: test%.cpp
 	$(CXX) $(CXXFLAGS) $(ABFILES) -D ABTREE -o $@ $?
 
 clean:
-	$(RM) *.o *.out *.txt
+	$(RM) *.o *.out *.txt *.db
+	$(RM) -r *.dSYM
