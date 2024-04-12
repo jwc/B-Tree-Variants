@@ -9,14 +9,14 @@
 #include "asbtree.h"
 #endif
 #ifdef ABTREE
-#include ""
+#include "ABTree.h"
 #endif
 #ifndef TREE
 #include "tree.h"
 #endif
 
 #ifndef COUNT
-#define COUNT 1000
+#define COUNT 10000
 #endif
 
 using namespace std;
@@ -29,7 +29,7 @@ int main() {
     Tree * t = NULL;
 
     #ifdef UBPTREE
-    t = new uBPlusTree("ubp1.txt");
+    t = new uBPlusTree("ubp1.db");
     #endif
     #ifdef ASBTREE
     //t = new ASBTree("asbtree");
@@ -37,7 +37,7 @@ int main() {
     return 0;
     #endif
     #ifdef ABTREE
-    t = NULL;
+    t = new ABTree("mydb", "table1", false);
     #endif
 
     #ifdef DEBUG
@@ -90,6 +90,8 @@ int main() {
     assert(allKeys.size() == t->getCardinality());
     #endif
     
+    t->close();
+
     cout << "    Pages Wrote: " << t->getNumWrites();
     cout << "\n    Pages  Read: " << t->getNumReads() << endl;
 

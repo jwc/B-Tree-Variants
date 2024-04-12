@@ -1,15 +1,15 @@
 CXX = clang++
-CXXFLAGS = -g -std=c++20 -D PAGE_SIZE=$(PAGE_SIZE) -D VALUE_SIZE=$(VALUE_SIZE)
+CXXFLAGS = -g -std=c++20 -D PAGE_SIZE=$(PAGE_SIZE) -D VALUE_SIZE=$(VALUE_SIZE) -D COUNT=10000
 
 PAGE_SIZE = 512
 VALUE_SIZE = 12
 
 UBPFILES = ubpOpen.o ubpWrite.o ubpRead.o ubpErase.o ubpMisc.o ubpRedist.o ubpCard.o
 ASBFILES = asberase.o asbinsert.o asbmisc.o asbsearch.o
-ABFILES = 
+ABFILES = ABTree.o
 
-# X -> testX.cpp
-TESTS = 0 1 2 3 4 5 6
+# X -> testX.cpp	
+TESTS = 1 2
 
 UBPTESTS := $(foreach test,$(TESTS),ubp$(test).out) 
 ASBTESTS := $(foreach test,$(TESTS),asb$(test).out) 
@@ -32,4 +32,5 @@ ab%.out: test%.cpp
 
 clean:
 	$(RM) *.o *.out *.txt *.db
+	$(RM) mydb.*.dat
 	$(RM) -r *.dSYM
