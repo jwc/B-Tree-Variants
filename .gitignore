@@ -30,6 +30,8 @@
 *.exe
 *.out
 *.app
+abttest*
 
 # database files
 mydb.table1.dat
+
