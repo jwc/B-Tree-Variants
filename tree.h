@@ -63,6 +63,14 @@ class Tree {
         int getNumReads() {
             return numReads;
         }
+
+        void clearReads() {
+            numReads = 0;
+        }
+
+        void clearWrites() {
+            numWrites = 0;
+        }
         
         #ifdef DEBUG
         virtual int getCardinality() = 0;

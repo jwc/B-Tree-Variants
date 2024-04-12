@@ -134,11 +134,11 @@ class ASBTree : public Tree {
         int nextFileNum;
         int currentFile;
         int currentFileWriteCount;
-        std::map<int, int> numValidNodesInFile;
-        std::map<int, NodeLocation> addressMap;
+        std::unordered_map<int, int> numValidNodesInFile;
+        std::unordered_map<int, NodeLocation> addressMap;
         std::unordered_set<NodeLocation> activeLocations;
-        std::map<int, std::string> fileNames;
-        std::set<int> files;
+        std::unordered_map<int, std::string> fileNames;
+        std::unordered_set<int> files;
         Node* writeBuffer[WRITE_BUFFER_SIZE];
         int writeBufferIndex;
         
@@ -165,7 +165,7 @@ class ASBTree : public Tree {
         int getCardinalityRecursive(Node *);
 
         int openFile(std::string filename) {
-            int file = ::open(filename.c_str(), O_RDWR | O_CREAT);
+            int file = ::open(filename.c_str(), O_RDWR | O_CREAT | O_SYNC);
             #ifdef DEBUG
             assert(file);
             #endif
@@ -278,7 +278,7 @@ class ASBTree : public Tree {
                     return writeBuffer[i];
                 }
             }
-            NodeLocation location = addressMap[nid];
+            NodeLocation location = addressMap.find(nid)->second;
             return (Node *) getPage(location.file, location.page);
         }
 

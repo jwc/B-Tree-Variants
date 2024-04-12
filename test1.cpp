@@ -62,6 +62,9 @@ int main() {
     }
     #endif
 
+    t->clearReads();
+    t->clearWrites();
+
     auto start = std::chrono::high_resolution_clock::now();
 
     // Writing random values to the tree.

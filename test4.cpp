@@ -85,6 +85,9 @@ int main() {
     // t->printTree();
     #endif
 
+    t->clearReads();
+    t->clearWrites();
+
     auto start = std::chrono::high_resolution_clock::now();
 
     // Deleting all values from the tree. Note: there are no repeats.

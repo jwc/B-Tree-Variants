@@ -1,5 +1,3 @@
-#include <bits/stdc++.h>
-
 #include "ubpTree.h"
 
 void uBPlusTree::open(std::string filename) {
@@ -10,7 +8,7 @@ void uBPlusTree::open(std::string filename) {
             struct stat fileInfo;
             int statRet = stat(filename.c_str(), &fileInfo);
             int mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-            database = ::open(filename.c_str(), O_RDWR | O_CREAT, mode);
+            database = ::open(filename.c_str(), O_RDWR | O_CREAT | O_SYNC, mode);
 
             if (statRet != 0 || fileInfo.st_size < 2 * PAGE_SIZE) {
                 // New tree

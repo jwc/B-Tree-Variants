@@ -62,6 +62,9 @@ int main() {
     }
     #endif
 
+    t->clearReads();
+    t->clearWrites();
+
     // Writing random values to the tree.
     for (int i = 0; allKeys.size() < COUNT; i++) {
         int x = rand();
