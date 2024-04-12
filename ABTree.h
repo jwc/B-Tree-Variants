@@ -1,6 +1,3 @@
-#ifndef _ABTREE_H
-#define _ABTREE_H 1
-
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,9 +15,9 @@
 #define TABLE_NAME_MAX_LEN 32
 #define TABLE_SUFFIX "dat"  // filename for table data: mydb.table1.dat
 #define TABLE_SUFFIX_LEN 3
-#define ABT_PAGE_SIZE 4096  // 4KB
+#define ABT_PAGE_SIZE PAGE_SIZE
 #define PAGE0_VERSION 1
-#define MAX_VAL_LEN 16  // includes one null terminator (used to be 16)
+#define MAX_VAL_LEN VALUE_SIZE
 
 #define DEFAULT_ROOT_PAGE_ID 2  // initial root page number
 
@@ -48,7 +45,10 @@ typedef struct ABTree : public Tree {
     ~ABTree();
     void write(int key, char value[MAX_VAL_LEN]) override;
     char * read(int key) override;
+
+    #ifdef DEBUG
     int getCardinality() override;
+    #endif
 
     void open(std::string filename) override {
         // Dummy implementation (no actual functionality)
@@ -64,10 +64,13 @@ typedef struct ABTree : public Tree {
         // Dummy implementation (no actual functionality)
         return;
     }
+
+    #ifdef DEBUG
     void printTree() override {
         // Dummy implementation (no actual functionality)
         return;
     }
+    #endif
 
     
 } ABTree;
@@ -75,5 +78,3 @@ typedef struct ABTree : public Tree {
 int abtTest1();
 int abtTest2();
 int abtTest3();
-
-#endif

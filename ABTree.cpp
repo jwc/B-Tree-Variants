@@ -892,9 +892,11 @@ char * ABTree::read(int key) {
     return nullptr;
 }
 
+#ifdef DEBUG
 int ABTree::getCardinality() {
     return table->tableFile.m_cardinality;
 }
+#endif
 
 int abtTest2() {
     Tree *t = new ABTree("mydb", "table1");
@@ -920,8 +922,10 @@ int abtTest2() {
         sprintf(val, "%d", key);
         t->write(key, val);
     }
+    
+    #ifdef DEBUG
     printf("Cardinality: %d\n", t->getCardinality());
-
+    #endif
 
     // char insertValue[MAX_VAL_LEN];
     // sprintf(insertValue, "%d", 1);

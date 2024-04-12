@@ -10,14 +10,14 @@
 #include "asbtree.h"
 #endif
 #ifdef ABTREE
-#include ""
+#include "ABTree.h"
 #endif
 #ifndef TREE
 #include "tree.h"
 #endif
 
 #ifndef COUNT
-#define COUNT 100000
+#define COUNT 10000
 #endif
 
 #define MAX 100
@@ -31,13 +31,13 @@ int main() {
     Tree * t = NULL;
 
     #ifdef UBPTREE
-    t = new uBPlusTree("ubp6.txt");
+    t = new uBPlusTree("ubp6.db");
     #endif
     #ifdef ASBTREE
     t = new ASBTree("asbtree");
     #endif
     #ifdef ABTREE
-    t = NULL;
+    t = new ABTree("mydb", "table6", true);
     #endif
 
     #ifdef DEBUG
@@ -45,6 +45,7 @@ int main() {
     assert(t->getCardinality() == 0);
     #endif
 
+    #ifndef DEBUG
     // Base values for the tree.
     for (int i = 0; i < COUNT; i++) {
         int x = rand();
@@ -61,6 +62,7 @@ int main() {
 
         t->write(x, z);
     }
+    #endif
 
     auto start = std::chrono::high_resolution_clock::now();
 

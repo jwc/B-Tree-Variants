@@ -10,14 +10,14 @@
 #include "asbtree.h"
 #endif
 #ifdef ABTREE
-#include ""
+#include "ABTree.h"
 #endif
 #ifndef TREE
 #include "tree.h"
 #endif
 
 #ifndef COUNT
-#define COUNT 100000
+#define COUNT 10000
 #endif
 
 using namespace std;
@@ -30,19 +30,20 @@ int main() {
     Tree * t = NULL;
 
     #ifdef UBPTREE
-    t = new uBPlusTree("ubp1.txt");
+    t = new uBPlusTree("ubp1.db");
     #endif
     #ifdef ASBTREE
     t = new ASBTree("asbtree");
     #endif
     #ifdef ABTREE
-    t = NULL;
+    t = new ABTree("mydb", "table1", true);
     #endif
 
     #ifdef DEBUG
     assert(t);
     #endif
 
+    #ifndef DEBUG
     // Base values for the tree.
     for (int i = 0; i < COUNT; i++) {
         int x = rand();
@@ -59,6 +60,7 @@ int main() {
 
         t->write(x, z);
     }
+    #endif
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -88,6 +90,8 @@ int main() {
     // cout << "\tExp. Card: " << allKeys.size() << endl;
     assert(allKeys.size() == t->getCardinality());
     #endif
+
+    t->close();
 
     cout << "    Pages Wrote: " << t->getNumWrites();
     cout << "\n    Pages  Read: " << t->getNumReads() << endl;
