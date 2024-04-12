@@ -1,6 +1,7 @@
 #include <cstring>
 #include <vector>
 #include <set>
+#include <chrono>
 
 #ifdef UBPTREE
 #include "ubpTree.h"
@@ -16,7 +17,7 @@
 #endif
 
 #ifndef COUNT
-#define COUNT 10000
+#define COUNT 100000
 #endif
 
 #define MAX 100
@@ -44,6 +45,25 @@ int main() {
     assert(t->getCardinality() == 0);
     #endif
 
+    // Base values for the tree.
+    for (int i = 0; i < COUNT; i++) {
+        int x = rand();
+        x = rand() % 2 ? -x : x;
+
+        string y = to_string(x);
+        char * z = new char[VALUE_SIZE]();
+        memset(z, '\0', VALUE_SIZE);
+        strcpy(z, y.c_str());
+
+        #ifdef DEBUG
+        assert(strlen(z) < VALUE_SIZE);
+        #endif
+
+        t->write(x, z);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     int x;
     char * z, * temp;
     for (int i = 0; i <= COUNT; i++) {
@@ -67,7 +87,7 @@ int main() {
                 #ifdef DEBUG
                 assert(t->read(x) != NULL);
                 #endif
-                
+
                 break;
             
             case 1: 
@@ -117,17 +137,21 @@ int main() {
                 break;
         }
 
-        // t->printTree();
     }
+
+    auto stop = std::chrono::high_resolution_clock::now();
 
     #ifdef DEBUG
     // t->printTree();
     // cout << "\tExp. Card: " << allKeys.size() << endl;
     assert(allKeys.size() == t->getCardinality());
     #endif
-    
+
+    t->close();
+
     cout << "    Pages Wrote: " << t->getNumWrites();
     cout << "\n    Pages  Read: " << t->getNumReads() << endl;
+    cout << "    Time to Perform Operations: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << "ms\n";
 
     delete t;
     return 0;
