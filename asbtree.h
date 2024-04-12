@@ -8,10 +8,9 @@
 
 #define NUM_LEAF_VALS (PAGE_SIZE - (4 * sizeof(int))) / (VALUE_SIZE + sizeof(int))
 #define NUM_BRANCH_VALS ((PAGE_SIZE - (3 * sizeof(int))) / (2 * sizeof(int)))
-#define GAIN_THRESHOLD 4
 #define WRITE_BUFFER_SIZE 10
-#define NODES_PER_FILE 10
-#define FILE_MIN_ACTIVE_NODES 5    // For non current files
+#define NODES_PER_FILE 16384
+#define FILE_MIN_ACTIVE_NODES NODES_PER_FILE / 10
 
 enum NodeType {BRANCH, LEAF};
 
@@ -95,8 +94,9 @@ class ASBTree : public Tree {
         void open(std::string filename) {
             return;
         }
+        
         void close() {
-            return;
+            flushWriteBuffer();
         }
 
         void write(int key, char * value) {
