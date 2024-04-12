@@ -1,4 +1,7 @@
 #include <iostream>
+#ifndef _TREE_H
+#define _TREE_H 1
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -72,3 +75,6 @@ class Tree {
         int numWrites;
         int numReads;
 };
+
+#endif // #ifndef _TREE_H
+

@@ -32,9 +32,9 @@ rm -f mydb.table1.dat
 # build object files
 for i in $(seq $start $end)
 do
-  g++ -g -c -DABTREE -DDEBUG -o abttest${i}.o  abttest${i}.cpp
+  g++ -g -c -DABTREE -DVALUE_SIZE=16 -DDEBUG -o abttest${i}.o  abttest${i}.cpp
 done
-g++ -g -c -DABTREE -DDEBUG -o ABTree.o ABTree.cpp
+g++ -g -c -DABTREE -DVALUE_SIZE=16 -DDEBUG -o ABTree.o ABTree.cpp
 
 # build tests
 for i in $(seq $start $end)
