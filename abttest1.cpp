@@ -24,57 +24,57 @@
 using namespace std;
 
 // Tests writing to a new tree.
-// int main() {
-//     return abtTest3();
-// }
 int main() {
-    vector<int> testValues;
-    set<int> allKeys;
-    Tree * t = NULL;
-
-    #ifdef UBPTREE
-    t = new uBPlusTree("ubp1.txt");
-    #endif
-    #ifdef ASBTREE
-    t = NULL;
-    #endif
-    #ifdef ABTREE
-    t = new ABTree("mydb", "table1", true);
-    #endif
-
-    #ifdef DEBUG
-    assert(t);
-    #endif
-
-    // Writing random values to the tree.
-    for (int i = 0; allKeys.size() < COUNT; i++) {
-        int x = rand();
-        x = rand() % 2 ? -x : x;
-        testValues.push_back(x);
-        allKeys.insert(x);
-
-        string y = to_string(x);
-        char * z = new char[VALUE_SIZE]();
-        memset(z, '\0', VALUE_SIZE);
-        strcpy(z, y.c_str());
-
-        #ifdef DEBUG
-        assert(strlen(z) < VALUE_SIZE);
-        #endif
-
-        t->write(x, z);
-    }
-
-    #ifdef DEBUG
-    // t->printTree();
-    // cout << "\tExp. Card: " << allKeys.size() << endl;
-    assert(allKeys.size() == t->getCardinality());
-    #endif
-    
-    cout << "    Number of rows inserted: " << t->getCardinality();
-    cout << "\n    Pages Wrote: " << t->getNumWrites();
-    cout << "\n    Pages  Read: " << t->getNumReads() << endl;
-
-    delete t;
-    return 0;
+    return abtTest1();
 }
+// int main() {
+//     vector<int> testValues;
+//     set<int> allKeys;
+//     Tree * t = NULL;
+
+//     #ifdef UBPTREE
+//     t = new uBPlusTree("ubp1.txt");
+//     #endif
+//     #ifdef ASBTREE
+//     t = NULL;
+//     #endif
+//     #ifdef ABTREE
+//     t = new ABTree("mydb", "table1", true);
+//     #endif
+
+//     #ifdef DEBUG
+//     assert(t);
+//     #endif
+
+//     // Writing random values to the tree.
+//     for (int i = 0; allKeys.size() < COUNT; i++) {
+//         int x = rand();
+//         x = rand() % 2 ? -x : x;
+//         testValues.push_back(x);
+//         allKeys.insert(x);
+
+//         string y = to_string(x);
+//         char * z = new char[VALUE_SIZE]();
+//         memset(z, '\0', VALUE_SIZE);
+//         strcpy(z, y.c_str());
+
+//         #ifdef DEBUG
+//         assert(strlen(z) < VALUE_SIZE);
+//         #endif
+
+//         t->write(x, z);
+//     }
+
+//     #ifdef DEBUG
+//     // t->printTree();
+//     // cout << "\tExp. Card: " << allKeys.size() << endl;
+//     assert(allKeys.size() == t->getCardinality());
+//     #endif
+    
+//     cout << "    Number of rows inserted: " << t->getCardinality();
+//     cout << "\n    Pages Wrote: " << t->getNumWrites();
+//     cout << "\n    Pages  Read: " << t->getNumReads() << endl;
+
+//     delete t;
+//     return 0;
+// }

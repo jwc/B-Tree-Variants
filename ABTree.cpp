@@ -1,6 +1,7 @@
 #include "ABTree.h"
 
 int debug = 0;  // change to 0 to disable debugging
+int detailedDebug = 0;  // change to 0 to disable debugging
 char g_search_buff[ABT_PAGE_SIZE];
 bool insertIsReplace = true;
 
@@ -120,6 +121,22 @@ void copyValue(char *dst, const char *src, int len) {
     dst[len-1] = '\0';
 }
 
+void reset_uint8_bitmap(uint8_t & bitmap) { 
+    bitmap = 0; 
+}
+
+void set_bit_uint8_bitmap(uint8_t & bitmap, int bitIndex) {
+    bitmap |= ((uint8_t) 1<<bitIndex);
+}
+
+void reset_bit_uint8_bitmap(uint8_t & bitmap, int bitIndex) {
+    bitmap &= ~((uint8_t) 1<<bitIndex);
+}
+
+bool test_bit_uint8_bitmap(uint8_t & bitmap, int bitIndex) {
+    return (bitmap & ((uint8_t) 1<<bitIndex)) != 0;
+}
+
 struct KeyValue {
     int key; // changed from uint32_t
     char value[MAX_VAL_LEN];
@@ -152,21 +169,29 @@ typedef struct Bucket {
 } Bucket;
 
 typedef struct Node {
-    uint32_t    m_eyeCatcher;  // for debugging purpose
-    uint32_t    m_pageNumber;  // for debugging purpose
-    char        isLeaf;
-    uint32_t    child[MAX_NUM_BUCKETS]; // offset for children
-    Bucket      bucket[MAX_NUM_BUCKETS];
-    int         key[MAX_NUM_KEYS];
-    char        value[MAX_NUM_KEYS][MAX_VAL_LEN];
-    uint32_t    nodeCard;
+    // uint32_t    m_eyeCatcher;  // for debugging purpose
+    // std::bitset<8>      isDeleteMarked;
+    uint32_t            m_pageNumber;  // for debugging purpose
+    uint32_t            child[MAX_NUM_BUCKETS]; // offset for children
+    uint8_t             nodeCard;
+    uint8_t             numDeleted;
+    uint8_t             deleteBitMap;
+    uint8_t             padding1;
+    int                 key[MAX_NUM_KEYS];
+    char                value[MAX_NUM_KEYS][MAX_VAL_LEN];
+    Bucket              bucket[MAX_NUM_BUCKETS];
 
     Node(uint32_t pageNumber) {
-        m_eyeCatcher = 0xdeadbeef;
+        // m_eyeCatcher = 0xdeadbeef;
+        reset_uint8_bitmap(deleteBitMap);
         m_pageNumber = pageNumber;
+        numDeleted = 0;
         nodeCard = 0;
         for (auto &c : child) {
             c = 0;
+        }
+        for (int k = 0; k < MAX_NUM_KEYS; k++) {
+            key[k] = 0;
         }
         for (auto &b : bucket) {
             b.bucketCard = 0;
@@ -177,11 +202,27 @@ typedef struct Node {
         }
     }
 
+    bool isEmpty() {
+        bool allBucketsEmpty = (nodeCard == 0);
+        if (allBucketsEmpty) {
+            for (int i = 0; i < MAX_NUM_BUCKETS; i++) {
+                if (child[i] != 0 || bucket[i].bucketCard > 0) {
+                    allBucketsEmpty = false;
+                    break;
+                }
+            }
+        }
+        return allBucketsEmpty;
+    }
+
     void print() {
         printf("Node Index: %d\n", m_pageNumber);
         printf("Node card: %d\n", nodeCard);
+        printf("Node num deleted: %d\n", numDeleted);
+        printf("Node deleteBitMap: %d\n", deleteBitMap);
+        printf("Node padding: %d\n", padding1);
         printf("Node [key:value]: ");
-        for (int i = 0; i < nodeCard; i++) {
+        for (int i = 0; i < nodeCard + numDeleted; i++) {
             printf("[%d:%s] ", key[i], value[i]);
         }
         printf("\n");
@@ -218,9 +259,103 @@ typedef struct Table {
         return 0;
     }
 
+    // Delete algorithm:
+    // if the key is found then performs the specified operation
+    // (e.g. delete if forDelete is true)
+    // and then returns true
+    int deleteHelper(int key, Node *node, bool *pageDeleted) {
+        int rc = 0;
+        *pageDeleted = false;
+        int bucketIndex = 0;
+
+        // first check if key is in keylist
+        int numKeys = node->numDeleted + node->nodeCard;
+        for (int k = 0; k < numKeys; k++) {
+            if (node->key[k] == key) {
+                if (test_bit_uint8_bitmap(node->deleteBitMap, k)) {
+                    rc = RC_NOT_FOUND;
+                    goto error_exit;
+                } else {
+                    set_bit_uint8_bitmap(node->deleteBitMap, k);
+                    memset(node->value[k], '\0', MAX_VAL_LEN);
+                    node->numDeleted++;
+                    node->nodeCard--;
+                    uint32_t pageNum = node->m_pageNumber;
+                    if (pageNum > DEFAULT_ROOT_PAGE_ID && node->isEmpty()) {
+                        *pageDeleted = true;
+                        rc = deallocatePage(pageNum);
+                        memset((char *) node, '\0', ABT_PAGE_SIZE);
+                        if (rc) goto error_exit;
+                    }
+                    rc = tableFile.writePage(pageNum, (char *) node);
+                }
+                goto exit;
+            }
+        }
+        // find proper bucket
+        while (bucketIndex < MAX_NUM_KEYS && key > node->key[bucketIndex]) {
+            bucketIndex++;
+        }
+        //  if bucket has child node
+        if (node->child[bucketIndex]) {
+            char page[ABT_PAGE_SIZE];
+            Node *child;
+            rc = getNode(page, node->child[bucketIndex], &child);
+            bool childDeleted = false;
+            rc = deleteHelper(key, child, &childDeleted);
+            if (rc) goto error_exit;
+            if (childDeleted) {
+                node->child[bucketIndex] = 0;
+                uint32_t pageNum = node->m_pageNumber;
+                if (pageNum > DEFAULT_ROOT_PAGE_ID && node->isEmpty()) {
+                    *pageDeleted = true;
+                    rc = deallocatePage(pageNum);
+                    memset((char *) node, '\0', ABT_PAGE_SIZE);
+                    if (rc) goto error_exit;
+                }
+                rc = tableFile.writePage(pageNum, (char *) node);
+                if (rc) goto error_exit;
+            }
+        } else {
+            // go through bucket and remove correct one
+            for (int i = 0; i < node->bucket[bucketIndex].bucketCard; i++) {
+                if (node->bucket[bucketIndex].entry[i].indexKey == key) {
+                    int j = i;
+                    while (j < node->bucket[bucketIndex].bucketCard - 1) {
+                        node->bucket[bucketIndex].entry[j].indexKey = node->bucket[bucketIndex].entry[j+1].indexKey;
+                        copyValue(node->bucket[bucketIndex].entry[j].value, node->bucket[bucketIndex].entry[j+1].value, MAX_VAL_LEN);
+                        j++;
+                    }
+                    //  clear last entry (bucketCard - 1)th entry
+                    node->bucket[bucketIndex].entry[j].indexKey = 0;
+                    memset(node->bucket[bucketIndex].entry[j].value, '\0', MAX_VAL_LEN);
+                    node->bucket[bucketIndex].bucketCard--;
+                    uint32_t pageNum = node->m_pageNumber;
+                    if (pageNum > DEFAULT_ROOT_PAGE_ID && node->isEmpty()) {
+                        *pageDeleted = true;
+                        rc = deallocatePage(pageNum);
+                        memset((char *) node, '\0', ABT_PAGE_SIZE);
+                        if (rc) goto error_exit;
+                    }
+                    rc = tableFile.writePage(pageNum, (char *) node);
+                    if (rc) goto error_exit;
+                    break;
+                }
+            }
+        }
+exit:
+        return rc;
+error_exit:
+        // error handling if any
+        if (rc == RC_NOT_FOUND) {
+            if (debug) printf("Key: %d not found\n", key);
+        }
+        goto exit;
+    }
+
     // returns 0 on success, RC_DUPLICATE_KEY on duplicate-key, or other error codes
     // todo: implement this
-    int insertHelper(int key, const char *value, Node *node, char *page) {
+    int insertHelper(int key, const char *value, Node *node) {
         //  if node has space in keylist
         //      insert into node's keylist
         //  else if proper bucket in node has empty space
@@ -231,14 +366,24 @@ typedef struct Table {
 
 
         // first check if keylist contains key already
-        for (int k = 0; k < node->nodeCard; k++) {
+        int numKeys = node->nodeCard + node->numDeleted;
+        for (int k = 0; k < numKeys; k++) {
+            // if (node->isDeleteMarked.test(k)) { k--; continue; }
             if (node->key[k] == key) {
+                // if key is delete marked
+                if (test_bit_uint8_bitmap(node->deleteBitMap, k)) {
+                    reset_bit_uint8_bitmap(node->deleteBitMap, k);
+                    node->nodeCard++;
+                    node->numDeleted--;
+                    copyValue(node->value[k], value, MAX_VAL_LEN);
+                    return tableFile.writePage(node->m_pageNumber, (char *) node);
+                }
+                // if not delete marked but want to replace
                 if (insertIsReplace) {
-                    // memset(node->value[k], '\0', MAX_VAL_LEN);
-                    // memcpy(node->value[k], value, MAX_VAL_LEN);
                     copyValue(node->value[k], value, MAX_VAL_LEN);
                     return tableFile.writePage(node->m_pageNumber, (char *) node);
                 } else {
+                    // if dont want to replace
                     return RC_DUPLICATE_KEY;
                 }
             }
@@ -268,9 +413,9 @@ typedef struct Table {
         //  if bucket has child node
         if (node->child[bucketIndex]) {
             // Node * newNode = nullptr;
-            char p[ABT_PAGE_SIZE];
-            int rc = getNode(p, node->child[bucketIndex], &node);
-            return insertHelper(key, value, node, page);
+            char page[ABT_PAGE_SIZE];
+            int rc = getNode(page, node->child[bucketIndex], &node);
+            return insertHelper(key, value, node);
         } else {
             // Check if bucket contains key already
             for (int k = 0; k < node->bucket[bucketIndex].bucketCard; k++) {
@@ -308,21 +453,33 @@ typedef struct Table {
 
                 // sort keyvaluepairs
                 qsort(keyValuePairs, MAX_BUCKET_SIZE+1, sizeof(KeyValue), compare);
+
+                // clear node's buckets keys and values
+                node->bucket[bucketIndex].bucketCard = 0;
+                for (int j = 0; j < MAX_BUCKET_SIZE; j++) {
+                    Entry &e = node->bucket[bucketIndex].entry[j];
+                    e.indexKey = 0;
+                    memset(e.value, '\0', MAX_VAL_LEN);
+                }
                 
                 // allocate new node
                 uint32_t index;
-                char p[ABT_PAGE_SIZE];
-                int rc = allocatePage(p, &index);
-                Node *child = (Node *) p;
-                child->m_eyeCatcher = 0xdeadbeef;
-                child->m_pageNumber = index;
+                char page[ABT_PAGE_SIZE];
+                int rc = allocatePage(page, &index);
+                Node *child = (Node *) page;
+                reset_uint8_bitmap(child->deleteBitMap);
+                child->numDeleted = 0;
                 child->nodeCard = 0;
+                child->m_pageNumber = index;
                 for (auto &c : child->child) {
                     c = 0;
                 }
+                for (int k = 0; k < MAX_NUM_KEYS; k++) {
+                    child->key[k] = 0;
+                }
                 for (auto &b : child->bucket) {
                     b.bucketCard = 0;
-                    for (auto &e : b.entry) {
+                    for (auto &e: b.entry) {
                         e.indexKey = 0;
                         e.value[0] = '\0';
                     }
@@ -377,7 +534,7 @@ typedef struct Table {
         char page[ABT_PAGE_SIZE];
         int rc = getRootNode(page, &root);
         if (rc) goto error_exit;
-        rc = insertHelper(key, value, root, &page[0]);
+        rc = insertHelper(key, value, root);
         if (!rc) tableFile.m_cardinality++;
         if (rc) goto error_exit;
 exit:
@@ -390,7 +547,7 @@ error_exit:
         goto exit;
     }
 
-    int updateHelper(int key, const char *value, Node * node, char *page) {
+    int updateHelper(int key, const char *value, Node * node) {
         int i = 0;
         // loop through node's keys
         while (i < node->nodeCard && key > node->key[i]) {
@@ -408,8 +565,9 @@ error_exit:
         // else
             // search bucket & update
         if (node->child[i]) {
+            char page[ABT_PAGE_SIZE];
             int rc = getNode(page, node->child[i], &node);
-            return updateHelper(key, value, node, page);
+            return updateHelper(key, value, node);
         } else {
             for (int j = 0; j < node->bucket[i].bucketCard; j++) {
                 if (node->bucket[i].entry[j].indexKey == key) {
@@ -429,7 +587,7 @@ error_exit:
         char page[ABT_PAGE_SIZE];
         int rc = getRootNode(page, &root);
         if (rc) goto error_exit;
-        rc = updateHelper(key, newValue, root, &page[0]);
+        rc = updateHelper(key, newValue, root);
         if (rc) goto error_exit;
         // if (rc == RC_NOT_FOUND) {
         //     printf("Key %d not found", key);
@@ -450,22 +608,38 @@ error_exit:
     // returns 0 on success, non-zero on error
     // todo: implement this
     int deleteRow(int key) {
-        fprintf(stderr, "%s not implemented\n", __func__);
-        return 1;
+        bool childDeleted = false;
+        Node * root = nullptr;
+        char page[ABT_PAGE_SIZE];
+        int rc = getRootNode(page, &root);
+        if (rc) goto error_exit;
+        rc = deleteHelper(key, root, &childDeleted);
+        if (rc) goto error_exit;
+exit:
+        return rc;
+error_exit: 
+        if (rc == RC_NOT_FOUND) {
+            printf("Key %d not found\n", key);
+            rc = 0;
+        }
+        goto exit;
     }
 
     // returns 0 on found, RC_NOT_FOUND if not found, or other error codes
     // todo: implement this
-    int searchHelper(int key, Node * node, char * outValue, char * page){
+    int searchHelper(int key, Node * node, char * outValue){
         int i = 0;
         // loop through node's keys
-        while (i < node->nodeCard && key > node->key[i]) {
+        while (i < node->nodeCard + node->numDeleted && key > node->key[i]) {
             i++;
         }
         // if key is found in keylist
-        if (i < node->nodeCard && key == node->key[i]) {
+        if (i < node->nodeCard + node->numDeleted && key == node->key[i]) {
+            if (test_bit_uint8_bitmap(node->deleteBitMap, i)) {
+                return RC_NOT_FOUND;
+            }
             memset(outValue, '\0', MAX_VAL_LEN);
-            memcpy(outValue, node->value[i], MAX_VAL_LEN);
+            copyValue(outValue, node->value[i], MAX_VAL_LEN);
             return 0;
         }
         //  if node->child[i] > 0:
@@ -473,13 +647,14 @@ error_exit:
         // else
             // search bucket
         if (node->child[i]) {
+            char page[ABT_PAGE_SIZE];
             int rc = getNode(page, node->child[i], &node);
-            return searchHelper(key, node, outValue, page);
+            return searchHelper(key, node, outValue);
         } else {
             for (int j = 0; j < node->bucket[i].bucketCard; j++) {
                 if (node->bucket[i].entry[j].indexKey == key) {
                     memset(outValue, '\0', MAX_VAL_LEN);
-                    memcpy(outValue, node->bucket[i].entry[j].value, MAX_VAL_LEN);
+                    copyValue(outValue, node->bucket[i].entry[j].value, MAX_VAL_LEN);
                     return 0;
                 }
             }
@@ -491,7 +666,7 @@ error_exit:
         char page[ABT_PAGE_SIZE];
         int rc = getRootNode(page, &root);
         if (rc) goto error_exit;
-        rc = searchHelper(key, root, outValue, &page[0]);
+        rc = searchHelper(key, root, outValue);
         if (rc) goto error_exit;
 exit:
         return rc;
@@ -605,6 +780,33 @@ error_exit:
         goto exit;
     }
 
+    // @pageNumber: input: page-id of page to be deallocated
+    // @returns: 0 on success, non zero on error
+	int deallocatePage(uint32_t pageNumber) {
+		int rc = 0;
+		uint32_t bitmapPageNumber = 1;
+		uint32_t byte = pageNumber / 8;
+		uint32_t bit = pageNumber % 8;
+		uint8_t mask =  (uint8_t) (~(1 << bit));
+		char page[ABT_PAGE_SIZE];
+		
+		// read bitmap page
+		rc = tableFile.readPage(bitmapPageNumber, page);
+		if (rc) goto error_exit;
+		
+		// mark the page deallocated
+		page[byte] &= mask;
+		
+		// write the bitmap
+		rc = tableFile.writePage(bitmapPageNumber, page);
+		if (rc) goto error_exit;
+exit:
+	    return rc;
+
+error_exit:
+        // error handling if any
+        goto exit;
+	}
 } Table;
 
 int Table::openTable(const char *schemaName, const char *tableName, Table **table) {
@@ -874,7 +1076,7 @@ void ABTree::write(int key, char value[MAX_VAL_LEN]) {
     int rc = table->insert(key, value);
     numReads = table->tableFile.m_readCount;
     numWrites = table->tableFile.m_writeCount;
-    if (debug) {
+    if (detailedDebug) {
         Node * r;
         char page[ABT_PAGE_SIZE];
         rc = table->getRootNode(page, &r);
@@ -883,6 +1085,7 @@ void ABTree::write(int key, char value[MAX_VAL_LEN]) {
 }
 
 char * ABTree::read(int key) {
+    if (debug) printf("Searching %d\n", key);
     int rc = 0;
     g_search_buff[0] = '\0';
     rc = table->search(key, g_search_buff);
@@ -890,6 +1093,23 @@ char * ABTree::read(int key) {
     numWrites = table->tableFile.m_writeCount;
     if (rc != RC_NOT_FOUND) return g_search_buff;
     return nullptr;
+}
+
+void ABTree::erase(int key) {
+    if (debug) printf("Deleting %d\n", key);
+    int rc = 0;
+    rc = table->deleteRow(key);
+    numReads = table->tableFile.m_readCount;
+    numWrites = table->tableFile.m_writeCount;
+    if (detailedDebug) {
+        Node * r;
+        char page[ABT_PAGE_SIZE];
+        rc = table->getRootNode(page, &r);
+        r->print();
+
+        rc = table->getNode(page, 2, &r);
+        r->print();
+    }
 }
 
 #ifdef DEBUG
@@ -937,16 +1157,47 @@ int abtTest2() {
 }
 
 int abtTest3() {
-    Tree *t = new ABTree("mydb", "table1");
+    Tree *t = new ABTree("mydb", "table1", true);
     t->write(1, (char *) "one");
     t->write(5, (char *) "five");
-    t->write(13, (char *) "thirteen");
-    const char *value1 = t->read(5);
-    printf("Before Update value is %s\n", value1);
-    t->write(5, (char *) "fifty");
-    const char *value2 = t->read(5);
-    printf("After Update value is %s\n", value2);
+    t->write(100, (char *) "hundred");
 
+    // force page allocation for 3rd bucket (2nd if 0 index)
+    t->write(6, (char *) "six");
+    t->write(50, (char *) "50");
+    t->write(60, (char *) "60");
+    t->write(70, (char *) "70");
+    t->write(80, (char *) "80");
+
+    // force new allocation under child 
+    t->write(7, (char *) "seven");
+    t->write(8, (char *) "eight");
+    t->write(9, (char *) "nine");
+    t->write(10, (char *) "ten");
+    t->write(11, (char *) "eleven");
+
+    // delete first chld
+    t->erase(6);
+    t->erase(50);
+    t->erase(60);
+    t->erase(70);
+    t->erase(80);
+
+    // delete second child (this should recursively deallocate child 1 and child 2 from root)
+    t->erase(7);
+    t->erase(8);
+    t->erase(9);
+    t->erase(10);
+    t->erase(11);
+
+
+    const char *value3 = t->read(11);
+    if (value3 == nullptr) {
+        printf("Key 6 deleted properly\n");
+    }
+    else {
+        printf("Error: After Delete value is %s\n", value3);
+    }
     return 0;
 
 }
@@ -954,14 +1205,15 @@ int abtTest1() {
     int rc = 0;
     char outValue[MAX_VAL_LEN];
     bool tableOpened = false;
-    Table *table = nullptr;
-    Node * r;
+
+    Tree *t = new ABTree("mydb", "table1");
+
     char page[ABT_PAGE_SIZE];
     char updatedVal[MAX_VAL_LEN] = "hello\0";
 
-    int x = -5; // Lower bound (inclusive)
-    int y = 15; // Upper bound (inclusive)
-    int size = 5; // Size of the vector
+    int x = -50000; // Lower bound (inclusive)
+    int y = 50000; // Upper bound (inclusive)
+    int size = 100; // Size of the vector
 
     // Seed the random number generator for reproducibility (optional)
     std::mt19937 gen(12345);
@@ -972,47 +1224,38 @@ int abtTest1() {
     for (int i = 0; i < size; ++i) {
         arr[i] = dis(gen);
     }
-
-    rc = createTable("mydb", "table1", 4096);
-    if (rc) goto error_exit;
-
-    rc = Table::openTable("mydb", "table1", &table);
-    if (rc) goto error_exit;
-    tableOpened = true;
-
-/*
     // bulk insert
     for (int key : arr) {
-        if (debug) printf("Inserting %d\n", key);
         char val[MAX_VAL_LEN];
         sprintf(val, "%d", key);
-        rc = table->insert(key, val);
-        if (rc) goto error_exit;
+        t->write(key, val);
     }
 
-    // bulk update
+    // bulk erase
     for (int key : arr) {
-        if (debug) printf("Updating %d\n", key);
-        char val[MAX_VAL_LEN];
-        sprintf(val, "%d_n", key);
-        rc = table->update(key, val);
-        if (rc) goto error_exit;
+        t->erase(key);
     }
 
     // bulk search
     for (int key : arr) {
-        printf("Searching %d ", key);
         char val[MAX_VAL_LEN];
         char outVal[MAX_VAL_LEN];
         sprintf(val, "%d", key);
-        rc = table->search(key, &outVal[0]);
-        if (outVal) printf("[%d:%s]\n", key, outVal);
-        if (rc) goto error_exit;
+        char * temp = t->read(key);
+
+        assert(temp == nullptr);
+        // std::string y = std::to_string(key);
+        // char * z = new char[VALUE_SIZE]();
+        // memset(z, '\0', VALUE_SIZE);
+        // strcpy(z, y.c_str());
+        // if (temp != nullptr){
+        //     assert(strcmp(z, temp) == 0);
+        // }    
+        // free(z);
     }
     // searching non existing keys
-*/
 
-
+/*
     // bulk random
     for (int i = 0; i < arr.size(); i++) {
         std::random_device rd;  // Obtain a random seed from the OS entropy device
@@ -1047,6 +1290,7 @@ int abtTest1() {
         if (!rc) r->print();
         printf("\n");
     }
+*/
 /*
 // root node
     rc = table->insert(5, "5");
@@ -1119,16 +1363,17 @@ int abtTest1() {
 */
     
 
-exit:
-    if (tableOpened) {
-        int rc2 = Table::closeTable(table);
-        // if there had been error before then preserve it, else set it.
-        if (!rc) rc = rc2;
-    }
-    return rc;
+// exit:
+//     if (tableOpened) {
+//         int rc2 = Table::closeTable(table);
+//         // if there had been error before then preserve it, else set it.
+//         if (!rc) rc = rc2;
+//     }
+//     return rc;
 
-error_exit:
-    // error handling if any
-    printf("ERROR: %d\n", rc);
-    goto exit;
+// error_exit:
+//     // error handling if any
+//     printf("ERROR: %d\n", rc);
+//     goto exit;
+    return 0;
 }
